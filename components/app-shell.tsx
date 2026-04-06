@@ -40,6 +40,7 @@ export function AppShell() {
   const [selectedChallenge, setSelectedChallenge] = useState<BuildingChallenge | null>(null);
   const [completedChallenge, setCompletedChallenge] = useState<BuildingChallenge | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [showCamera, setShowCamera] = useState(false);
 
   async function handleAnalyze() {
@@ -59,6 +60,7 @@ export function AppShell() {
     setCapturedImage(screenshot);
     setIsAnalyzing(true);
     setErrorMessage(null);
+    setErrorDetails(null);
 
     try {
       const response = await fetch("/magna-mind/api/analyze", {
@@ -73,7 +75,8 @@ export function AppShell() {
       };
 
       if (!response.ok || data.error) {
-        throw new Error(data.details || data.error || "Analysis failed.");
+        setErrorDetails(data.details ?? null);
+        throw new Error(data.error || "Analysis failed.");
       }
 
       startTransition(() => {
@@ -94,6 +97,7 @@ export function AppShell() {
   function handleReset() {
     setCapturedImage(demoImageSrc);
     setErrorMessage(null);
+    setErrorDetails(null);
     setSelectedChallenge(null);
     setCompletedChallenge(null);
     setStep("scan");
@@ -192,6 +196,7 @@ export function AppShell() {
             capturedImage={capturedImage}
             isAnalyzing={isAnalyzing}
             errorMessage={errorMessage}
+            errorDetails={errorDetails}
             fileInputRef={fileInputRef}
             onOpenCamera={() => setShowCamera(true)}
             onAnalyze={handleAnalyze}
@@ -253,6 +258,7 @@ function ScanStep({
   capturedImage,
   isAnalyzing,
   errorMessage,
+  errorDetails,
   fileInputRef,
   onOpenCamera,
   onAnalyze
@@ -260,6 +266,7 @@ function ScanStep({
   capturedImage: string;
   isAnalyzing: boolean;
   errorMessage: string | null;
+  errorDetails: string | null;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   onOpenCamera: () => void;
   onAnalyze: () => void;
@@ -335,8 +342,14 @@ function ScanStep({
         </div>
 
         {errorMessage && (
-          <div className="mx-4 mb-4 rounded-2xl border-2 border-ink bg-coral/60 px-4 py-3 text-sm font-semibold">
-            {errorMessage}
+          <div className="mx-4 mb-4 rounded-2xl border-2 border-ink bg-coral/60 px-4 py-3 text-sm">
+            <p className="font-semibold">{errorMessage}</p>
+            {errorDetails && (
+              <details className="mt-2">
+                <summary className="cursor-pointer text-xs text-ink/60">Raw response</summary>
+                <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all text-xs text-ink/70">{errorDetails}</pre>
+              </details>
+            )}
           </div>
         )}
       </div>
