@@ -1,10 +1,11 @@
 "use client";
 
-import { startTransition, useRef, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 
 import confetti from "canvas-confetti";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, LazyMotion, domAnimation, m as motion } from "framer-motion";
 import {
+  Camera,
   Check,
   ChevronLeft,
   Layers3,
@@ -39,6 +40,7 @@ export function AppShell() {
   const [selectedChallenge, setSelectedChallenge] = useState<BuildingChallenge | null>(null);
   const [completedChallenge, setCompletedChallenge] = useState<BuildingChallenge | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showCamera, setShowCamera] = useState(false);
 
   async function handleAnalyze() {
     let screenshot: string | null = null;
@@ -130,13 +132,10 @@ export function AppShell() {
   const stepIndex = { scan: 0, pick: 1, build: 2, celebrate: 3 }[step];
 
   return (
+    <LazyMotion features={domAnimation}>
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 pb-20 pt-4 text-ink sm:max-w-lg">
       {/* Header */}
-      <motion.header
-        initial={{ opacity: 0, y: -12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-4 flex items-center justify-between"
-      >
+      <header className="mb-4 flex items-center justify-between">
         <div className="inline-flex items-center gap-2 rounded-full border-2 border-ink bg-white/80 px-3 py-2 text-xs font-bold uppercase tracking-[0.2em]">
           <Star className="h-3.5 w-3.5" />
           Magna-Mind
@@ -153,13 +152,10 @@ export function AppShell() {
             Start Over
           </motion.button>
         )}
-      </motion.header>
+      </header>
 
       {/* Step Progress */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.04 }}
+      <div
         className="mb-5 grid grid-cols-3 gap-2"
       >
         {[
@@ -171,22 +167,22 @@ export function AppShell() {
           return (
             <div
               key={s.label}
-              className={`flex items-center gap-2 rounded-2xl border-2 border-ink px-3 py-2 transition-colors ${
+              className={`flex items-center justify-center gap-1.5 rounded-2xl border-2 border-ink px-2 py-1.5 transition-colors ${
                 active ? s.color : "bg-white/60"
               }`}
             >
               <div
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-ink text-xs font-bold ${
+                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-ink text-[10px] font-bold ${
                   active ? "bg-white" : "bg-white/50"
                 }`}
               >
-                {stepIndex > i ? <Check className="h-3 w-3" /> : i + 1}
+                {stepIndex > i ? <Check className="h-2.5 w-2.5" /> : i + 1}
               </div>
-              <span className="text-xs font-bold">{s.label}</span>
+              <span className="truncate text-xs font-bold">{s.label}</span>
             </div>
           );
         })}
-      </motion.div>
+      </div>
 
       {/* Steps */}
       <AnimatePresence mode="wait">
@@ -197,6 +193,7 @@ export function AppShell() {
             isAnalyzing={isAnalyzing}
             errorMessage={errorMessage}
             fileInputRef={fileInputRef}
+            onOpenCamera={() => setShowCamera(true)}
             onAnalyze={handleAnalyze}
           />
         )}
@@ -231,15 +228,22 @@ export function AppShell() {
         )}
       </AnimatePresence>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={handleFileChange}
-      />
+      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+
+      <AnimatePresence>
+        {showCamera && (
+          <CameraModal
+            onCapture={(dataUrl) => {
+              setCapturedImage(dataUrl);
+              setShowCamera(false);
+              setErrorMessage(null);
+            }}
+            onClose={() => setShowCamera(false)}
+          />
+        )}
+      </AnimatePresence>
     </main>
+    </LazyMotion>
   );
 }
 
@@ -250,12 +254,14 @@ function ScanStep({
   isAnalyzing,
   errorMessage,
   fileInputRef,
+  onOpenCamera,
   onAnalyze
 }: {
   capturedImage: string;
   isAnalyzing: boolean;
   errorMessage: string | null;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
+  onOpenCamera: () => void;
   onAnalyze: () => void;
 }) {
   return (
@@ -299,23 +305,32 @@ function ScanStep({
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3 p-4">
+        <div className="flex gap-3 p-4 pb-6">
+          <motion.button
+            whileTap={{ scale: 0.93 }}
+            onClick={onOpenCamera}
+            disabled={isAnalyzing}
+            className="soft-brutal-card flex flex-1 items-center justify-center gap-2 bg-white px-3 py-3 font-display text-sm font-semibold disabled:opacity-50"
+          >
+            <Camera className="h-4 w-4 shrink-0" />
+            Camera
+          </motion.button>
           <motion.button
             whileTap={{ scale: 0.93 }}
             onClick={() => fileInputRef.current?.click()}
             disabled={isAnalyzing}
-            className="soft-brutal-card flex flex-1 items-center justify-center gap-2 bg-white px-4 py-4 font-display text-base font-semibold disabled:opacity-50"
+            className="soft-brutal-card flex flex-1 items-center justify-center gap-2 bg-white px-3 py-3 font-display text-sm font-semibold disabled:opacity-50"
           >
-            <Upload className="h-4 w-4" />
-            Use My Photo
+            <Upload className="h-4 w-4 shrink-0" />
+            Gallery
           </motion.button>
           <motion.button
             whileTap={{ scale: 0.93 }}
             onClick={onAnalyze}
             disabled={isAnalyzing}
-            className="soft-brutal-card flex-[2] bg-coral px-5 py-4 font-display text-base font-semibold disabled:opacity-50"
+            className="soft-brutal-card flex-[2] whitespace-nowrap bg-coral px-3 py-3 font-display text-sm font-semibold disabled:opacity-50"
           >
-            {isAnalyzing ? "Counting..." : "Count These Tiles →"}
+            {isAnalyzing ? "Counting…" : "Count Tiles →"}
           </motion.button>
         </div>
 
@@ -951,6 +966,154 @@ function IsoTile({
       <polygon points={topPts} fill={topColor} stroke={border} strokeWidth={bw} strokeLinejoin="round" />
       <polygon points={iPts} fill="white" fillOpacity="0.22" />
     </g>
+  );
+}
+
+/* ─── Camera Modal ───────────────────────────────────────────────────────── */
+
+function CameraModal({
+  onCapture,
+  onClose
+}: {
+  onCapture: (dataUrl: string) => void;
+  onClose: () => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function startCamera() {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        if (!cancelled) setError("Camera not available. Use HTTPS or upload a photo instead.");
+        return;
+      }
+      try {
+        // Try with preferred constraints first, fall back to bare `true` if overconstrained
+        let stream: MediaStream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
+            audio: false
+          });
+        } catch (e) {
+          if (e instanceof DOMException && e.name === "OverconstrainedError") {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          } else {
+            throw e;
+          }
+        }
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.onloadedmetadata = () => setReady(true);
+        }
+      } catch (e) {
+        if (cancelled) return;
+        if (e instanceof DOMException) {
+          if (e.name === "NotAllowedError" || e.name === "PermissionDeniedError") {
+            setError("Camera access denied. Please allow camera permissions in your browser settings and try again.");
+          } else if (e.name === "NotFoundError" || e.name === "DevicesNotFoundError") {
+            setError("No camera found on this device.");
+          } else if (e.name === "NotReadableError" || e.name === "TrackStartError") {
+            setError("Camera is in use by another app. Close it and try again.");
+          } else {
+            setError(`Camera error: ${e.message}`);
+          }
+        } else {
+          setError("Could not start camera. Try uploading a photo instead.");
+        }
+      }
+    }
+
+    startCamera();
+
+    return () => {
+      cancelled = true;
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
+
+  function handleSnap() {
+    const video = videoRef.current;
+    if (!video) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d")?.drawImage(video, 0, 0);
+    onCapture(canvas.toDataURL("image/jpeg", 0.92));
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex flex-col bg-black"
+    >
+      {/* Viewfinder */}
+      <div className="relative flex-1 overflow-hidden">
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className="h-full w-full object-cover"
+        />
+        {!ready && !error && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <p className="text-sm font-semibold text-white/70">Starting camera…</p>
+          </div>
+        )}
+        {error && (
+          <div className="absolute inset-0 flex items-center justify-center px-8 text-center">
+            <p className="text-sm font-semibold text-white/80">{error}</p>
+          </div>
+        )}
+        {/* Corner guides */}
+        {ready && (
+          <div className="pointer-events-none absolute inset-8">
+            {[
+              "top-0 left-0 border-t-2 border-l-2",
+              "top-0 right-0 border-t-2 border-r-2",
+              "bottom-0 left-0 border-b-2 border-l-2",
+              "bottom-0 right-0 border-b-2 border-r-2"
+            ].map((cls) => (
+              <div key={cls} className={`absolute h-8 w-8 border-white/70 ${cls}`} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Controls */}
+      <div className="flex items-center justify-between bg-black px-8 py-6">
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={onClose}
+          className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-white/40 text-white"
+        >
+          ✕
+        </motion.button>
+
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={handleSnap}
+          disabled={!ready}
+          className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-white bg-white/20 disabled:opacity-40"
+        >
+          <div className="h-14 w-14 rounded-full bg-white" />
+        </motion.button>
+
+        <div className="h-12 w-12" />
+      </div>
+    </motion.div>
   );
 }
 
