@@ -199,7 +199,7 @@ function isAnalyzeResponse(value: unknown): value is AnalyzeResponse {
         challenge.preview &&
         typeof challenge.preview.caption === "string" &&
         Array.isArray(challenge.preview.tiles) &&
-        challenge.preview.tiles.length >= 4
+        challenge.preview.tiles.length >= 2
     )
   );
 }
