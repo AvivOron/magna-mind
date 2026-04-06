@@ -26,7 +26,7 @@ const tiles = [
 ] as const;
 
 const challengeColors = ["bg-mint", "bg-coral", "bg-sky"] as const;
-const demoImageSrc = "/tiles.jpeg";
+const demoImageSrc = "/magna-mind/tiles.jpeg";
 
 type AppStep = "scan" | "pick" | "build" | "celebrate";
 
