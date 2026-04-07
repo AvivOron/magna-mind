@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import type { AnalyzeResponse } from "@/lib/types";
+import type { AnalyzeResponse, BuildMatrixNode, BuildingChallenge, TileShape } from "@/lib/types";
 
 const GEMINI_URL =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+
+const fallbackDetectedColors = ["#ef4444", "#0ea5e9", "#f59e0b", "#22c55e"];
 
 export async function POST(request: NextRequest) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -43,51 +45,30 @@ export async function POST(request: NextRequest) {
             parts: [
               {
                 text: [
-                  "You are counting magnetic tiles in a photo taken by a child.",
+                  "You are analyzing a real photo of Magna-Tiles style magnetic tiles taken by a child.",
                   "STEP 1 — COUNT CAREFULLY:",
-                  "Scan the entire image systematically. Count EVERY tile you can see, including:",
-                  "- tiles that are partially hidden behind other tiles",
-                  "- tiles in stacks (count each visible layer)",
-                  "- tiles at the edges of the frame",
-                  "- tiles that are connected to each other in a structure",
-                  "Do NOT skip tiles just because they overlap. Be generous — it is better to count a tile you are unsure about than to miss it.",
-                  "Count exactly these 4 shapes:",
-                  "  squares — perfectly square tiles (all 4 sides equal, all 4 corners 90°)",
-                  "  rectangles — oblong tiles that are exactly twice as long as they are wide (a rectangle, like 2 squares side by side)",
-                  "  equilateralTriangles — triangles where ALL THREE sides are the same length; they look roughly as wide as they are tall",
-                  "  isoscelesTriangles — tall narrow triangles with a short base; they fit perfectly along the long edge of a rectangle",
-                  "HOW TO TELL THEM APART:",
-                  "  - A tile that looks like 2 squares joined together = rectangle",
-                  "  - A triangle as wide as a square side = equilateralTriangle",
-                  "  - A triangle as wide as half a square side (fits 2 per square) = isoscelesTriangle",
-                  "Count EVERY visible tile of each type, including stacked and overlapping ones.",
-                  "STEP 2 — GENERATE 3 CHALLENGES:",
-                  "Create 3 building challenges using only the pieces you counted. Never invent pieces that aren't in the image.",
+                  "Count EVERY visible tile in the image, including partially occluded tiles, stacked tiles, edge tiles, and tiles already assembled in a build.",
+                  "Only count these shapes: squares, rectangles, equilateralTriangles, isoscelesTriangles.",
+                  "STEP 2 — DETECT TILE COLORS:",
+                  "Identify the main tile colors actually visible in the photo. Return 3 to 6 bright hex colors in detectedColors.",
+                  "STEP 3 — GENERATE 3 BUILDS:",
+                  "Generate 3 build ideas using only the counted inventory. Never invent extra pieces.",
                   "Return JSON only. No markdown. No explanation text.",
                   "Use this exact top-level shape:",
-                  '{ "pieceInventory": { "squares": number, "rectangles": number, "equilateralTriangles": number, "isoscelesTriangles": number }, "challenges": [ ...3 items... ] }',
-                  "Requirements for challenges:",
+                  '{ "pieceInventory": { "squares": number, "rectangles": number, "equilateralTriangles": number, "isoscelesTriangles": number }, "detectedColors": ["#RRGGBB"], "challenges": [ ...3 items... ] }',
+                  "Challenge requirements:",
                   "- difficulty order must be easy-2d, medium-3d, hard-3d",
                   "- each challenge needs a catchy kid-friendly name",
                   "- each challenge needs exactly one emoji",
                   "- each challenge needs exactly 3 short steps",
-                  "- add piecesUsed counts for each challenge and never exceed the detected inventory",
-                  "- prefer options that fit the actual mix of pieces well, not generic builds",
-                  "- add a preview object with a short caption and tiles on a 3-axis integer grid",
-                  "- col = left-right position (integer >= 0)",
-                  "- row = front-back depth position (integer >= 0, 0 is front)",
-                  "- layer = vertical height (integer >= 0, 0 is ground level, 1 is one tile up, etc.)",
-                  "- square occupies 1×1 footprint",
-                  "- rectangle occupies 2×1 footprint (col is left edge)",
-                  "- equilateralTriangle occupies 1×1 footprint; flip = 'up' or 'down'",
-                  "- isoscelesTriangle occupies 1×1 footprint; flip = 'up' or 'down'",
-                  "- for easy-2d challenges: all tiles should have layer=0 (flat layout)",
-                  "- for medium-3d and hard-3d: use layer > 0 to show height (e.g. a tower has layer 0,1,2 stacked at same col/row)",
-                  "- keep footprint compact: 2–5 cols wide, 2–4 rows deep",
-                  "- color must be a bright hex like #F59E0B, use a different color per tile",
-                  "- use 4 to 12 tiles in the preview",
-                  "Each challenge object must look like:",
-                  '{ "difficulty": "easy-2d|medium-3d|hard-3d", "name": string, "emoji": string, "steps": [string, string, string], "piecesUsed": { "squares": number, "rectangles": number, "equilateralTriangles": number, "isoscelesTriangles": number }, "preview": { "caption": string, "tiles": [ { "shape": "square|rectangle|equilateralTriangle|isoscelesTriangle", "col": integer, "row": integer, "layer": integer, "color": "#RRGGBB", "flip": "up|down" } ] } }'
+                  "- add piecesUsed counts and never exceed the detected inventory",
+                  "- add primaryColor as a vivid color name like Ruby Red, Ocean Blue, Sunburst Yellow, Mint Glow",
+                  "- add preview.caption as a short schematic caption",
+                  "- add buildMatrix as an array of sections describing shape placement",
+                  "- each buildMatrix item must be: { section: string, position: \"base\"|\"middle\"|\"top\"|\"left\"|\"center\"|\"right\", shapes: [\"square\"|\"rectangle\"|\"equilateralTriangle\"|\"isoscelesTriangle\"] }",
+                  "- keep buildMatrix compact with 2 to 4 sections and 1 to 4 shapes per section",
+                  "- if the build is house-like, include a base section of squares/rectangles and a top section with triangles",
+                  'Each challenge object must look like: { "difficulty": "easy-2d|medium-3d|hard-3d", "name": string, "emoji": string, "steps": [string, string, string], "piecesUsed": { "squares": number, "rectangles": number, "equilateralTriangles": number, "isoscelesTriangles": number }, "primaryColor": string, "preview": { "caption": string }, "buildMatrix": [{ "section": string, "position": "base|middle|top|left|center|right", "shapes": ["square|rectangle|equilateralTriangle|isoscelesTriangle"] }] }'
                 ].join("\n")
               },
               {
@@ -118,7 +99,8 @@ export async function POST(request: NextRequest) {
     }
 
     const payload = (await geminiResponse.json()) as GeminiApiResponse;
-    const rawText = payload.candidates?.[0]?.content?.parts?.[0]?.text;
+    const parts = payload.candidates?.[0]?.content?.parts ?? [];
+    const rawText = parts.find((part) => !part.thought && typeof part.text === "string")?.text;
 
     if (!rawText) {
       return NextResponse.json(
@@ -127,9 +109,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const analysis = normalizeAnalyzeResponse(JSON.parse(rawText));
+    const analysis = normalizeAnalyzeResponse(JSON.parse(extractJson(rawText)));
 
-    if (!isAnalyzeResponse(analysis)) {
+    if (!analysis) {
       return NextResponse.json(
         {
           error: "Gemini response did not match expected structure.",
@@ -164,46 +146,6 @@ function parseDataUrl(value: string) {
   };
 }
 
-function isAnalyzeResponse(value: unknown): value is AnalyzeResponse {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const response = value as AnalyzeResponse;
-  const inventory = response.pieceInventory;
-
-  if (
-    !inventory ||
-    typeof inventory.squares !== "number" ||
-    typeof inventory.rectangles !== "number" ||
-    typeof inventory.equilateralTriangles !== "number" ||
-    typeof inventory.isoscelesTriangles !== "number"
-  ) {
-    return false;
-  }
-
-  return (
-    Array.isArray(response.challenges) &&
-    response.challenges.length === 3 &&
-    response.challenges.every(
-      (challenge) =>
-        typeof challenge.name === "string" &&
-        typeof challenge.emoji === "string" &&
-        Array.isArray(challenge.steps) &&
-        challenge.steps.length === 3 &&
-        challenge.piecesUsed &&
-        typeof challenge.piecesUsed.squares === "number" &&
-        typeof challenge.piecesUsed.rectangles === "number" &&
-        typeof challenge.piecesUsed.equilateralTriangles === "number" &&
-        typeof challenge.piecesUsed.isoscelesTriangles === "number" &&
-        challenge.preview &&
-        typeof challenge.preview.caption === "string" &&
-        Array.isArray(challenge.preview.tiles) &&
-        challenge.preview.tiles.length >= 2
-    )
-  );
-}
-
 function normalizeAnalyzeResponse(value: unknown): AnalyzeResponse | null {
   if (!value || typeof value !== "object") {
     return null;
@@ -212,37 +154,34 @@ function normalizeAnalyzeResponse(value: unknown): AnalyzeResponse | null {
   const source = value as Record<string, unknown>;
   const inventory = toPieceInventory(source.pieceInventory);
   const rawChallenges = Array.isArray(source.challenges) ? source.challenges : [];
+  const detectedColors = normalizeDetectedColors(source.detectedColors);
 
   if (!inventory || rawChallenges.length < 3) {
     return null;
   }
 
-  const difficulties: AnalyzeResponse["challenges"][number]["difficulty"][] = [
-    "easy-2d",
-    "medium-3d",
-    "hard-3d"
-  ];
-
-  const normalizedChallenges = rawChallenges.slice(0, 3).map((challenge, index) =>
+  const difficulties: BuildingChallenge["difficulty"][] = ["easy-2d", "medium-3d", "hard-3d"];
+  const challenges = rawChallenges.slice(0, 3).map((challenge, index) =>
     normalizeChallenge(challenge, difficulties[index], inventory, index)
   );
 
-  if (normalizedChallenges.some((challenge) => !challenge)) {
+  if (challenges.some((challenge) => !challenge)) {
     return null;
   }
 
   return {
     pieceInventory: inventory,
-    challenges: normalizedChallenges as AnalyzeResponse["challenges"]
+    detectedColors,
+    challenges: challenges as AnalyzeResponse["challenges"]
   };
 }
 
 function normalizeChallenge(
   value: unknown,
-  fallbackDifficulty: AnalyzeResponse["challenges"][number]["difficulty"],
+  fallbackDifficulty: BuildingChallenge["difficulty"],
   inventory: AnalyzeResponse["pieceInventory"],
   index: number
-) {
+): BuildingChallenge | null {
   if (!value || typeof value !== "object") {
     return null;
   }
@@ -257,7 +196,7 @@ function normalizeChallenge(
   }
 
   const piecesUsed = clampPiecesUsed(toPieceInventory(source.piecesUsed), inventory);
-  const preview = normalizePreview(source.preview, source.name, index);
+  const buildMatrix = normalizeBuildMatrix(source.buildMatrix, source.name, index);
 
   return {
     difficulty: normalizeDifficulty(source.difficulty) ?? fallbackDifficulty,
@@ -265,8 +204,26 @@ function normalizeChallenge(
     emoji: typeof source.emoji === "string" && source.emoji.trim() ? source.emoji.trim() : fallbackEmoji(index),
     steps: [steps[0], steps[1], steps[2]] as [string, string, string],
     piecesUsed,
-    preview
+    primaryColor:
+      typeof source.primaryColor === "string" && source.primaryColor.trim()
+        ? source.primaryColor.trim()
+        : fallbackPrimaryColor(index),
+    preview: {
+      caption:
+        valuePreviewCaption(source.preview) ??
+        `Blueprint view for ${typeof source.name === "string" ? source.name : fallbackName(index)}.`
+    },
+    buildMatrix
   };
+}
+
+function valuePreviewCaption(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const preview = value as Record<string, unknown>;
+  return typeof preview.caption === "string" && preview.caption.trim() ? preview.caption.trim() : null;
 }
 
 function normalizeDifficulty(value: unknown) {
@@ -307,51 +264,67 @@ function clampPiecesUsed(
   };
 }
 
-function normalizePreview(value: unknown, name: unknown, index: number) {
-  const source = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
-  const rawTiles = Array.isArray(source.tiles) ? source.tiles : [];
-  const tiles = rawTiles
-    .map(normalizePreviewTile)
-    .filter((tile): tile is NonNullable<ReturnType<typeof normalizePreviewTile>> => Boolean(tile))
-    .slice(0, 12);
+function normalizeBuildMatrix(value: unknown, name: unknown, index: number): BuildMatrixNode[] {
+  const rawSections = Array.isArray(value) ? value : [];
+  const sections = rawSections
+    .map(normalizeBuildMatrixNode)
+    .filter((section): section is BuildMatrixNode => Boolean(section))
+    .slice(0, 4);
+
+  return sections.length >= 2
+    ? sections
+    : fallbackBuildMatrix(typeof name === "string" ? name : fallbackName(index), index);
+}
+
+function normalizeBuildMatrixNode(value: unknown): BuildMatrixNode | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const source = value as Record<string, unknown>;
+  const position = normalizePosition(source.position);
+  const shapes = Array.isArray(source.shapes)
+    ? source.shapes.filter((shape): shape is TileShape => isTileShape(shape)).slice(0, 4)
+    : [];
+
+  if (!position || shapes.length === 0) {
+    return null;
+  }
 
   return {
-    caption:
-      typeof source.caption === "string" && source.caption.trim()
-        ? source.caption.trim()
-        : `A playful preview of ${typeof name === "string" ? name : fallbackName(index)}.`,
-    tiles: tiles.length >= 2 ? tiles : fallbackPreviewTiles(index)
+    section: typeof source.section === "string" && source.section.trim() ? source.section.trim() : position,
+    position,
+    shapes
   };
 }
 
-function normalizePreviewTile(value: unknown) {
-  if (!value || typeof value !== "object") return null;
+function normalizePosition(value: unknown) {
+  return value === "base" ||
+    value === "middle" ||
+    value === "top" ||
+    value === "left" ||
+    value === "center" ||
+    value === "right"
+    ? value
+    : null;
+}
 
-  const source = value as Record<string, unknown>;
-  const shape =
-    source.shape === "square" ||
-    source.shape === "rectangle" ||
-    source.shape === "equilateralTriangle" ||
-    source.shape === "isoscelesTriangle"
-      ? source.shape
-      : null;
+function isTileShape(value: unknown): value is TileShape {
+  return (
+    value === "square" ||
+    value === "rectangle" ||
+    value === "equilateralTriangle" ||
+    value === "isoscelesTriangle"
+  );
+}
 
-  if (!shape) return null;
+function normalizeDetectedColors(value: unknown) {
+  if (!Array.isArray(value)) {
+    return fallbackDetectedColors;
+  }
 
-  const rawFlip = source.flip;
-  const flip =
-    rawFlip === "up" || rawFlip === "down" || rawFlip === "left" || rawFlip === "right"
-      ? rawFlip
-      : "up";
-
-  return {
-    shape,
-    col: toNonNegativeInt(source.col),
-    row: toNonNegativeInt(source.row),
-    layer: toNonNegativeInt(source.layer),
-    color: isHexColor(source.color) ? source.color : fallbackColor(shape),
-    flip
-  };
+  const colors = value.filter((entry): entry is string => isHexColor(entry)).slice(0, 6);
+  return colors.length >= 3 ? colors : fallbackDetectedColors;
 }
 
 function toNonNegativeInt(value: unknown) {
@@ -366,52 +339,42 @@ function isHexColor(value: unknown): value is string {
   return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value);
 }
 
-function fallbackColor(shape: "square" | "rectangle" | "equilateralTriangle" | "isoscelesTriangle") {
-  if (shape === "square") return "#7DD3C7";
-  if (shape === "rectangle") return "#A78BFA";
-  if (shape === "equilateralTriangle") return "#FB923C";
-  return "#60A5FA";
-}
-
 function fallbackName(index: number) {
-  return ["Sunny Stack", "Rocket Hop", "Castle Pop"][index] ?? "Tile Build";
+  return ["Sun House", "Rocket Tower", "Castle Gate"][index] ?? "Tile Build";
 }
 
 function fallbackEmoji(index: number) {
-  return ["☀️", "🚀", "🏰"][index] ?? "✨";
+  return ["🏠", "🚀", "🏰"][index] ?? "✨";
 }
 
-function fallbackPreviewTiles(index: number) {
-  const sets = [
-    // Easy 2D: simple house flat layout
+function fallbackPrimaryColor(index: number) {
+  return ["Ruby Red", "Ocean Blue", "Sunburst Yellow"][index] ?? "Mint Glow";
+}
+
+function fallbackBuildMatrix(name: string, index: number): BuildMatrixNode[] {
+  if (/house|home|cabin|barn|hut/i.test(name)) {
+    return [
+      { section: "base", position: "base", shapes: ["square", "square"] },
+      { section: "roof", position: "top", shapes: ["equilateralTriangle"] }
+    ];
+  }
+
+  const sets: BuildMatrixNode[][] = [
     [
-      { shape: "equilateralTriangle", col: 0, row: 0, layer: 0, color: "#FB923C", flip: "up" },
-      { shape: "equilateralTriangle", col: 1, row: 0, layer: 0, color: "#34D399", flip: "up" },
-      { shape: "square", col: 0, row: 1, layer: 0, color: "#7DD3C7", flip: "up" },
-      { shape: "square", col: 1, row: 1, layer: 0, color: "#60A5FA", flip: "up" },
-      { shape: "square", col: 0, row: 2, layer: 0, color: "#FCD34D", flip: "up" },
-      { shape: "square", col: 1, row: 2, layer: 0, color: "#F472B6", flip: "up" }
+      { section: "base", position: "base", shapes: ["square", "square"] },
+      { section: "roof", position: "top", shapes: ["equilateralTriangle"] }
     ],
-    // Medium 3D: tower — squares stacked vertically
     [
-      { shape: "square", col: 0, row: 0, layer: 0, color: "#7DD3C7", flip: "up" },
-      { shape: "square", col: 0, row: 0, layer: 1, color: "#60A5FA", flip: "up" },
-      { shape: "square", col: 0, row: 0, layer: 2, color: "#FCD34D", flip: "up" },
-      { shape: "equilateralTriangle", col: 0, row: 0, layer: 3, color: "#FB923C", flip: "up" },
-      { shape: "square", col: 1, row: 0, layer: 0, color: "#34D399", flip: "up" },
-      { shape: "square", col: 1, row: 0, layer: 1, color: "#A78BFA", flip: "up" }
+      { section: "core", position: "middle", shapes: ["rectangle"] },
+      { section: "boosters", position: "base", shapes: ["square", "square"] },
+      { section: "nose", position: "top", shapes: ["equilateralTriangle"] }
     ],
-    // Hard 3D: castle with two towers at different heights
     [
-      { shape: "rectangle", col: 0, row: 1, layer: 0, color: "#7DD3C7", flip: "up" },
-      { shape: "square", col: 0, row: 0, layer: 0, color: "#60A5FA", flip: "up" },
-      { shape: "square", col: 0, row: 0, layer: 1, color: "#F472B6", flip: "up" },
-      { shape: "equilateralTriangle", col: 0, row: 0, layer: 2, color: "#FB923C", flip: "up" },
-      { shape: "square", col: 1, row: 0, layer: 0, color: "#34D399", flip: "up" },
-      { shape: "square", col: 1, row: 0, layer: 1, color: "#FCD34D", flip: "up" },
-      { shape: "equilateralTriangle", col: 1, row: 0, layer: 2, color: "#F59E0B", flip: "up" }
+      { section: "towers", position: "left", shapes: ["square", "square"] },
+      { section: "bridge", position: "center", shapes: ["rectangle"] },
+      { section: "spire", position: "top", shapes: ["equilateralTriangle", "equilateralTriangle"] }
     ]
-  ] as const;
+  ];
 
   return sets[index] ?? sets[0];
 }
@@ -421,7 +384,15 @@ type GeminiApiResponse = {
     content?: {
       parts?: Array<{
         text?: string;
+        thought?: boolean;
       }>;
     };
   }>;
 };
+
+function extractJson(text: string): string {
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start === -1 || end === -1 || end < start) return text;
+  return text.slice(start, end + 1);
+}

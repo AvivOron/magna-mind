@@ -4,12 +4,10 @@
 
 :root {
   color-scheme: light;
-  --bg-cream: #fff7ea;
-  --bg-mint: #b9f2de;
-  --bg-coral: #ffb8a9;
-  --bg-sky: #daf4ff;
-  --ink: #222222;
-  --glass: rgba(255, 255, 255, 0.48);
+  --ink: #0f172a;
+  --blueprint-bg: #f8fafc;
+  --blueprint-line: rgba(59, 130, 246, 0.11);
+  --blueprint-line-bold: rgba(14, 165, 233, 0.12);
 }
 
 * {
@@ -19,9 +17,9 @@
 html {
   min-height: 100%;
   background:
-    radial-gradient(circle at top left, rgba(185, 242, 222, 0.95), transparent 30%),
-    radial-gradient(circle at top right, rgba(255, 184, 169, 0.8), transparent 32%),
-    linear-gradient(180deg, #fffdf8 0%, var(--bg-cream) 100%);
+    radial-gradient(circle at top left, rgba(186, 230, 253, 0.45), transparent 24%),
+    radial-gradient(circle at top right, rgba(125, 211, 252, 0.3), transparent 28%),
+    linear-gradient(180deg, #ffffff 0%, var(--blueprint-bg) 100%);
   background-attachment: fixed;
 }
 
@@ -34,28 +32,22 @@ body {
     "Nunito",
     "Trebuchet MS",
     sans-serif;
-  background-image: radial-gradient(circle at 1px 1px, rgba(34, 34, 34, 0.04) 1px, transparent 0);
-  background-size: 20px 20px;
+  background-color: var(--blueprint-bg);
+  background-image:
+    linear-gradient(var(--blueprint-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--blueprint-line) 1px, transparent 1px),
+    linear-gradient(var(--blueprint-line-bold) 1px, transparent 1px),
+    linear-gradient(90deg, var(--blueprint-line-bold) 1px, transparent 1px);
+  background-size: 24px 24px, 24px 24px, 120px 120px, 120px 120px;
+  background-position: 0 0, 0 0, -1px -1px, -1px -1px;
+}
+
+.text-balance {
+  text-wrap: balance;
 }
 
 button,
 input,
 textarea {
   font: inherit;
-}
-
-.glass-panel {
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.4));
-}
-
-.soft-brutal-card {
-  border: 2px solid var(--ink);
-  border-radius: 32px;
-  box-shadow: 0 14px 0 0 rgba(34, 34, 34, 0.08);
-}
-
-.text-balance {
-  text-wrap: balance;
 }

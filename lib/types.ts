@@ -6,35 +6,24 @@ export type PieceInventory = {
 };
 
 export type ChallengeDifficulty = "easy-2d" | "medium-3d" | "hard-3d";
+export type TileShape = "square" | "rectangle" | "equilateralTriangle" | "isoscelesTriangle";
 
-/**
- * Grid-snapped tile for the preview.
- *
- * The preview uses a unit grid where one cell = one square tile side.
- *
- * col / row  — integer grid position (top-left corner of the tile's bounding box)
- * shape      — the tile shape
- * color      — hex color string
- * flip       — for triangles: which orientation
- *
- * Shape bounding boxes on the grid:
- *   square              → 1×1 cell
- *   rectangle           → 2×1 cells (landscape)
- *   equilateralTriangle → 1×1 cell  (flip: "up" | "down")
- *   isoscelesTriangle   → 1×2 cells tall (flip: "up" | "down" | "left" | "right")
- */
-export type PreviewTile = {
-  shape: "square" | "rectangle" | "equilateralTriangle" | "isoscelesTriangle";
-  col: number;   // grid column (x axis, left→right)
-  row: number;   // grid row (y axis, front→back in iso view)
-  layer: number; // vertical stack height (0 = ground)
-  color: string;
-  flip?: "up" | "down" | "left" | "right";
+export type BuildMatrixPosition =
+  | "base"
+  | "middle"
+  | "top"
+  | "left"
+  | "center"
+  | "right";
+
+export type BuildMatrixNode = {
+  section: string;
+  position: BuildMatrixPosition;
+  shapes: TileShape[];
 };
 
 export type ChallengePreview = {
   caption: string;
-  tiles: PreviewTile[];
 };
 
 export type BuildingChallenge = {
@@ -43,10 +32,13 @@ export type BuildingChallenge = {
   emoji: string;
   steps: [string, string, string];
   piecesUsed: PieceInventory;
+  primaryColor: string;
+  buildMatrix: BuildMatrixNode[];
   preview: ChallengePreview;
 };
 
 export type AnalyzeResponse = {
   pieceInventory: PieceInventory;
+  detectedColors: string[];
   challenges: [BuildingChallenge, BuildingChallenge, BuildingChallenge];
 };

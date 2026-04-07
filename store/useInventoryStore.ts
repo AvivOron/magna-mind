@@ -1,11 +1,15 @@
 import { create } from "zustand";
 
-import type { AnalyzeResponse, PieceInventory } from "@/lib/types";
+import type { AnalyzeResponse, BuildingChallenge, PieceInventory } from "@/lib/types";
 
 type InventoryState = {
   inventory: PieceInventory;
-  challenges: AnalyzeResponse["challenges"] | [];
+  detectedColors: string[];
+  challenges: BuildingChallenge[];
+  completedNames: string[];
   setAnalysis: (analysis: AnalyzeResponse) => void;
+  addChallenges: (challenges: BuildingChallenge[]) => void;
+  removeChallenge: (name: string) => void;
   reset: () => void;
 };
 
@@ -18,15 +22,30 @@ const emptyInventory: PieceInventory = {
 
 export const useInventoryStore = create<InventoryState>((set) => ({
   inventory: emptyInventory,
+  detectedColors: [],
   challenges: [],
+  completedNames: [],
   setAnalysis: (analysis) =>
     set({
       inventory: analysis.pieceInventory,
-      challenges: analysis.challenges
+      detectedColors: analysis.detectedColors,
+      challenges: analysis.challenges,
+      completedNames: []
     }),
+  addChallenges: (newChallenges) =>
+    set((state) => ({
+      challenges: [...state.challenges, ...newChallenges]
+    })),
+  removeChallenge: (name) =>
+    set((state) => ({
+      challenges: state.challenges.filter((c) => c.name !== name),
+      completedNames: [...state.completedNames, name]
+    })),
   reset: () =>
     set({
       inventory: emptyInventory,
-      challenges: []
+      detectedColors: [],
+      challenges: [],
+      completedNames: []
     })
 }));

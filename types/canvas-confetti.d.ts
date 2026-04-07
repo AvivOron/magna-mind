@@ -3,6 +3,7 @@ declare module "canvas-confetti" {
     particleCount?: number;
     spread?: number;
     startVelocity?: number;
+    colors?: string[];
     origin?: {
       x?: number;
       y?: number;
